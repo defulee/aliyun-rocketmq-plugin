@@ -1,0 +1,96 @@
+{
+  "request": {
+    "url": "api/ds/query",
+    "method": "POST",
+    "data": {
+      "queries": [
+        {
+          "refId": "A",
+          "datasource": {
+            "uid": "ZOLrCUBnk",
+            "type": "mysql"
+          },
+          "rawSql": "SELECT\n  count(1) as '数量',\n  status\nFROM furniture_trade__trade_order_line_s_o\nGROUP BY status",
+          "format": "table",
+          "datasourceId": 1,
+          "intervalMs": 60000,
+          "maxDataPoints": 892
+        }
+      ],
+      "range": {
+        "from": "2022-06-18T21:23:51.143Z",
+        "to": "2022-06-19T03:23:51.143Z",
+        "raw": {
+          "from": "now-6h",
+          "to": "now"
+        }
+      },
+      "from": "1655587431143",
+      "to": "1655609031143"
+    },
+    "hideFromInspector": false
+  },
+  "response": {
+    "results": {
+      "A": {
+        "frames": [
+          {
+            "schema": {
+              "refId": "A",
+              "meta": {
+                "executedQueryString": "SELECT\n  count(1) as '数量',\n  status\nFROM furniture_trade__trade_order_line_s_o\nGROUP BY status"
+              },
+              "fields": [
+                {
+                  "name": "数量",
+                  "type": "number",
+                  "typeInfo": {
+                    "frame": "int64",
+                    "nullable": true
+                  }
+                },
+                {
+                  "name": "status",
+                  "type": "string",
+                  "typeInfo": {
+                    "frame": "string",
+                    "nullable": true
+                  }
+                }
+              ]
+            },
+            "data": {
+              "values": [
+                [
+                  1376926,
+                  7429541,
+                  6012,
+                  176255,
+                  8517,
+                  91305,
+                  15227,
+                  6,
+                  343378,
+                  104430
+                ],
+                [
+                  "CLOSED",
+                  "DONE",
+                  "TO_ALLOT",
+                  "TO_AUDIT",
+                  "TO_CONFIRM",
+                  "TO_FULFILL",
+                  "TO_OUTBOUND",
+                  "TO_PUSH",
+                  "WAIT_RECEIVING",
+                  "WAITING"
+                ]
+              ]
+            }
+          }
+        ],
+        "refId": "A"
+      }
+    }
+  }
+}
