@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"fmt"
+
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
@@ -97,10 +98,25 @@ func (d *RocketMqDatasource) query(_ context.Context, pCtx backend.PluginContext
 	response := backend.DataResponse{}
 
 	payload, err := models.ParsePayload(query)
-	if err != nil {
+	if err != nil || payload.Hide {
 		return response
 	}
 
+	// create data frame response.
+	// add fields.
+	// add the frames to the response.
+	if payload.Action == "ConsumerAccumulate" {
+		d.queryConsumerAccumulate(payload, query, &response)
+	} else if payload.Action == "TrendTopicInputTps" {
+		d.queryTrendTopicInputTps(payload, query, &response)
+	} else if payload.Action == "TrendGroupOutputTps" {
+		d.queryTrendGroupOutputTps(payload, query, &response)
+	}
+
+	return response
+}
+
+func (d *RocketMqDatasource) queryConsumerAccumulate(payload *models.QueryPayload, query backend.DataQuery, response *backend.DataResponse) {
 	request := ons.CreateOnsConsumerAccumulateRequest()
 
 	request.Scheme = "https"
@@ -113,29 +129,95 @@ func (d *RocketMqDatasource) query(_ context.Context, pCtx backend.PluginContext
 	if err != nil {
 		fmt.Print(err.Error())
 		d.log.Error("OnsConsumerAccumulate ", "GroupId", payload.GroupId, "error ", err)
-		return backend.DataResponse{
-			Error: err,
-		}
+		return
 	}
 
 	d.log.Info("query OnsConsumerAccumulate ", "topic count", len(onsResp.Data.DetailInTopicList.DetailInTopicDo))
 
-	// create data frame response.
 	frame := data.NewFrame(query.RefID)
 
 	fieldValArrMap := make(map[string]float64)
 	for _, detailInTopicDo := range onsResp.Data.DetailInTopicList.DetailInTopicDo {
 		fieldValArrMap[detailInTopicDo.Topic] = float64(detailInTopicDo.TotalDiff)
 	}
-	// add fields.
+
 	for field, val := range fieldValArrMap {
 		frame.Fields = append(frame.Fields, data.NewField(field, nil, val))
 	}
 
-	// add the frames to the response.
 	response.Frames = append(response.Frames, frame)
+}
 
-	return response
+func (d *RocketMqDatasource) queryTrendTopicInputTps(payload *models.QueryPayload, query backend.DataQuery, response *backend.DataResponse) {
+	req := ons.CreateOnsTrendTopicInputTpsRequest()
+
+	req.Scheme = "https"
+	req.InstanceId = d.Settings.InstanceId
+	req.Topic = payload.Topic
+	req.Type = requests.NewInteger(1)
+	req.Period = requests.NewInteger(1)
+	req.BeginTime = requests.NewInteger(payload.From)
+	req.EndTime = requests.NewInteger(payload.To)
+
+	resp, err := d.Client.OnsTrendTopicInputTps(req)
+	if err != nil {
+		fmt.Print(err.Error())
+		d.log.Error("queryTrendTopicInputTps ", "Topic", payload.GroupId, "error ", err)
+		return
+	}
+
+	d.log.Info("query OnsTrendTopicInputTps ", "record count", len(resp.Data.Records.StatsDataDo))
+
+	frame := data.NewFrame(query.RefID)
+
+	fieldValArrMap := make(map[string]float64)
+	for _, statsDataDo := range resp.Data.Records.StatsDataDo {
+		fieldValArrMap["time"] = float64(statsDataDo.X)
+		fieldValArrMap["value"] = float64(statsDataDo.Y)
+	}
+
+	for field, val := range fieldValArrMap {
+		frame.Fields = append(frame.Fields, data.NewField(field, nil, val))
+	}
+
+	response.Frames = append(response.Frames, frame)
+}
+
+func (d *RocketMqDatasource) queryTrendGroupOutputTps(payload *models.QueryPayload, query backend.DataQuery, response *backend.DataResponse) {
+	request := ons.CreateOnsTrendGroupOutputTpsRequest()
+
+	request.Scheme = "https"
+
+	request.InstanceId = d.Settings.InstanceId
+	request.GroupId = payload.GroupId
+	request.Topic = payload.Topic
+	request.Type = requests.NewInteger(1)
+	request.Period = requests.NewInteger(1)
+	request.BeginTime = requests.NewInteger(payload.From)
+	request.EndTime = requests.NewInteger(payload.To)
+
+	resp, err := d.Client.OnsTrendGroupOutputTps(request)
+	if err != nil {
+		fmt.Print(err.Error())
+		d.log.Error("OnsTrendGroupOutputTps ", "GroupId", payload.GroupId, "error ", err)
+		return
+	}
+
+	d.log.Info("query OnsTrendGroupOutputTps ", "topic count", len(resp.Data.Records.StatsDataDo))
+
+	frame := data.NewFrame(query.RefID)
+
+	fieldValArrMap := make(map[string]float64)
+	for _, statsDataDo := range resp.Data.Records.StatsDataDo {
+		fieldValArrMap["time"] = float64(statsDataDo.X)
+		fieldValArrMap["value"] = float64(statsDataDo.Y)
+	}
+
+	for field, val := range fieldValArrMap {
+		frame.Fields = append(frame.Fields, data.NewField(field, nil, val))
+	}
+
+	response.Frames = append(response.Frames, frame)
 }
 
 // CheckHealth handles health checks sent from Grafana to the plugin.
